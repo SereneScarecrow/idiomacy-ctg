@@ -1,0 +1,10 @@
+experiment: idiomacy-ctg
+temperature: 0.75
+
+prompts: [idiomatic_low_v1, idiomatic_medium_v1, idiomatic_high_v1]
+models:  [qwen2.5:3b, qwen2.5:7b, qwen2.5:14b, mistral:7b]
+
+dataset:
+  path: data/processed/dataset_maxi.csv
+
+seeds: [1, 42, 67]
