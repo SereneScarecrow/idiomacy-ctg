@@ -6,11 +6,29 @@ This repository contains materials for coursework on figurative language generat
 
 This research proposes an original method for studying idiomaticity and text style using supervised generation. It's development stems from the fact that NLP studies often focuse on singular expressions, when in a coherent text these expressions can occur together in one context. The proposed method involves assessing LLMs' ability to transform literal version of the text into an figurative one with a specified level of idiomaticity (low, medium, or high).
 
-## Research pipeline
+### Research pipeline
 
 First, a parralel Russian‑language corpus of literary and news texts was created. It includes original texts, their literalized versions, which are as devoid of figurative language as possible, as well as manual annotation of six types of figurative units (phraseological, semantic, word‑formational, syntactic, pragmatic, and discursive).
 
 Then, 4 language models were tested: Qwen2.5-3B, Qwen2.5-7B, Qwen2.5-14B. They were prompted to generate texts containing low, medium and high levels of figurativeness. All generations were run through the evaluation pipeline, which contains three parts: LLM-as-a-judge evalutaion, automatic metrics for generation quality and various text qualities.
+
+## Setup
+
+### Installation
+
+```
+git clone https://github.com/SereneScarecrow/coursework-idiomacy-ctg.git
+cd coursework-idiomacy-ctg
+```
+
+### Environment
+
+Set your API-keys in a .env file:
+```
+GIGACHAT_API_KEY="your-key"
+```
+
+## Quick start
 
 ## Project structure
 
@@ -27,8 +45,7 @@ idiomacy-ctg/
 │   └── DATASET.md
 ├── src/idiomacy/
 │   ├── data/          # build_dataset.py (text normalization, metrics, result validation)
-│   ├── generation/
-│   ├── judge/
+│   ├── llm/           # llm-interface module (built to work with both text and pictures)
 │   ├── metrics/
 │   │   ├── text.py            # unified text processing
 │   │   ├── spans.py           # idiom spans finder
