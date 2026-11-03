@@ -59,6 +59,10 @@ idiomacy-ctg/
 
 ## AI usage
 
-The AI-powered literature search assistant provided on the arXiv platform was used during the initial stages of this project to discover relevant research materials and references. All literature sources and citations suggested by the assistant tool were rewieved manualy before inclusion.
+- **Literature Search**: The AI-powered literature search assistant provided on the arXiv platform was used during the initial stages of this project to discover relevant research materials and references. All literature sources and citations suggested by the assistant tool were rewieved manualy before inclusion.
 
-Claude (Anthropic) was used as a coding and review assistant for parts of this repository. The research design, data collection and annotation, experiments and all final decisions, as well as the conclusions of the study, belong to the author. AI-generated code was checked, tested and edited where nessesary by the author before inclusion.
+- **Prompt Engineering**: DeepSeek-V3 was used to refine prompts for literal and idiomatic text generation.
+
+- **Coding**: Claude (Anthropic) was used as a coding and review assistant. AI-generated code was checked, tested and edited where nessesary by the author before inclusion.
+
+The research design, data collection and annotation, experiments and all final decisions, as well as the conclusions of the study, belong to the author.
