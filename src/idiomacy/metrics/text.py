@@ -10,8 +10,11 @@ import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib import metadata
+from typing import List, Union
 
 import spacy
+from spacy.tokens import Doc
+
 
 # updated when rules of text processing change
 # directly affects every numeric metric in the dataset
@@ -189,15 +192,11 @@ def count_words(text: str, model: str = DEFAULT_MODEL) -> int:
     return sum(token.is_word for token in tokenize(normalize_text(text), model))
 
 
-def pipeline_info(model: str = DEFAULT_MODEL) -> dict:
-    """Versions to be written into the run manifest."""
-    return {
-        "text_pipeline_version": TEXT_PIPELINE_VERSION,
-        "spacy": spacy.__version__,
-        "spacy_model": model,
-        "spacy_model_version": get_nlp(model).meta.get("version"),
-        "pymorphy3": metadata.version("pymorphy3"),
-    }
+def content_lemmas(doc: Doc) -> list[str]:
+    """
+    Filters lemmas, returns only meaningful lemmas from a spacy Doc object.
+    """
+    return [token.lemma_ for token in doc if not token.is_stop]
 
 
 def sentences():
@@ -207,8 +206,3 @@ def sentences():
     pass
 
 
-def content_tokens():
-    """
-    Filters tokens, returns only meaningful tokens.
-    """
-    pass
