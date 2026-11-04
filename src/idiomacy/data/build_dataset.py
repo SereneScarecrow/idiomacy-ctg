@@ -38,7 +38,9 @@ MAX_TEXTS_PER_AUTHOR = 2
 LENGTH_RANGE = (100, 400)
 
 
-# ---------------------------------------------------------------- loading
+# ---------------------------------------------------------------- 
+# loading
+# ----------------------------------------------------------------
 
 def read_raw(path) -> pd.DataFrame:
     return pd.read_csv(path)
@@ -59,7 +61,9 @@ def prepare_raw(raw: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ---------------------------------------------------------------- processing
+# ---------------------------------------------------------------- 
+# processing
+# ----------------------------------------------------------------
 
 def normalize_entries(df: pd.DataFrame, columns=("original_text", "literal_text")) -> pd.DataFrame:
     """
@@ -105,7 +109,9 @@ def count_dataset_metrics(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ---------------------------------------------------------------- levels
+# ---------------------------------------------------------------- 
+# levels
+# ----------------------------------------------------------------
 
 def resolve_thresholds(titr: pd.Series, low_max=None, high_min=None) -> dict:
     """
@@ -158,7 +164,9 @@ def assign_titr_levels(df: pd.DataFrame, thresholds: dict) -> pd.DataFrame:
     return df
 
 
-# ---------------------------------------------------------------- validation
+# ---------------------------------------------------------------- 
+# validation
+# ----------------------------------------------------------------
 
 def validate_dataset(df: pd.DataFrame) -> dict:
     """Errors stop the build, warnings are only reported."""
@@ -200,7 +208,9 @@ def validate_dataset(df: pd.DataFrame) -> dict:
     return {"errors": errors, "warnings": warnings}
 
 
-# ---------------------------------------------------------------- build and save
+# ---------------------------------------------------------------- 
+# build and save
+# ----------------------------------------------------------------
 
 def export_frame(df: pd.DataFrame) -> pd.DataFrame:
     """Final columns in a fixed order; idioms and their positions are stored as JSON."""
