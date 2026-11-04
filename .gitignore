@@ -1,9 +1,6 @@
-# virtual environment
 venv/
-
-checkpoints/
 comet_models/
-
+*.egg-info/
 __pycache__/
 *.py[cod]
 
