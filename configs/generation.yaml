@@ -1,5 +1,5 @@
 # output folder name
-experiment: idiomacy-ctg-small-test
+experiment: idiomacy-ctg
 
 # generation params
 backend: ollama
