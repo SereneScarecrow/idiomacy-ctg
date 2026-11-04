@@ -1,10 +1,37 @@
-experiment: idiomacy-ctg
-temperature: 0.75
+# output folder name
+experiment: idiomacy-ctg-small-test
 
+# generation params
+backend: ollama
+temperature: 0.75
+max_tokens:
+extra: {num_ctx: 8192}
+
+# idiomatic_density borders between levels (rounded to 2 decimal places, see data/processed/titr_thresholds.json)
+low_max: 0.12
+high_min: 0.38
+
+# experiment grid
 prompts: [idiomatic_low_v1, idiomatic_medium_v1, idiomatic_high_v1]
 models:  [qwen2.5:3b, qwen2.5:7b, qwen2.5:14b, mistral:7b]
+seeds: [1, 42, 67]
 
+# data
 dataset:
   path: data/processed/dataset_maxi.csv
 
-seeds: [1, 42, 67]
+# JSON-schema
+schema:
+  type: "object"
+  required: ["generated_text", "idiomatic_percentage"]
+  additionalProperties: false
+  properties:
+    generated_text:
+      type: "string"
+      description: "Сгенерированный образный текст (художественный текст, насыщенный метафорами, идиомами и фигурами речи)."
+    idiomatic_percentage:
+      type: "integer"
+      minimum: 0
+      maximum: 100
+      description: "Процент идиоматичности текста цифрой от 0 до 100, где 0 — сухой академический текст, а 100 — текст, целиком состоящий из фразеологизмов и устойчивых выражений."
+ 
