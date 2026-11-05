@@ -4,7 +4,7 @@ experiment: idiomacy-ctg
 # generation params
 backend: ollama
 temperature: 0.75
-max_tokens:
+max_tokens: 2048
 extra: {num_ctx: 8192}
 
 # idiomatic_density borders between levels (percentage, initially rounded to 2 decimal places, see data/processed/titr_thresholds.json)
