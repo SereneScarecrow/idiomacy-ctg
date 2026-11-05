@@ -7,9 +7,9 @@ temperature: 0.75
 max_tokens:
 extra: {num_ctx: 8192}
 
-# idiomatic_density borders between levels (rounded to 2 decimal places, see data/processed/titr_thresholds.json)
-low_max: 0.12
-high_min: 0.38
+# idiomatic_density borders between levels (percentage, initially rounded to 2 decimal places, see data/processed/titr_thresholds.json)
+low_max: 12
+high_min: 38
 
 # experiment grid
 prompts: [idiomatic_low_v1, idiomatic_medium_v1, idiomatic_high_v1]
