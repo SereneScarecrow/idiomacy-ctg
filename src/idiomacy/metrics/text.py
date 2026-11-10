@@ -13,7 +13,7 @@ from importlib import metadata
 from typing import List, Union
 
 import spacy
-from spacy.tokens import Doc
+from spacy.tokens import Doc, Token as SpacyToken
 
 
 # updated when rules of text processing change
@@ -192,11 +192,11 @@ def count_words(text: str, model: str = DEFAULT_MODEL) -> int:
     return sum(token.is_word for token in tokenize(normalize_text(text), model))
 
 
-def content_lemmas(doc: Doc) -> list[str]:
+def get_content_tokens(doc: Doc) -> list[SpacyToken]:
     """
     Filters lemmas, returns only meaningful lemmas from a spacy Doc object.
     """
-    return [token.lemma_ for token in doc if not token.is_stop]
+    return [token for token in doc if not token.is_stop and not token.is_punct] # and token.is_alpha]
 
 
 def sentences():
