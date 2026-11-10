@@ -10,7 +10,7 @@ from collections import Counter
 from spacy.tokens import Doc
 from wordfreq import zipf_frequency
 
-from idiomacy.metrics.text import content_lemmas
+from idiomacy.metrics.text import get_content_tokens
 
 
 def _load_abstractness_dict(dict_path: Union[str, Path]) -> dict:
@@ -28,7 +28,7 @@ def calculate_mean_abstractness(doc: Doc, dict_path: Union[str, Path]) -> Option
         
     abstractness_dict = _load_abstractness_dict(dict_path)
 
-    lemmas = content_lemmas(doc)
+    lemmas = [token.lemma_ for token in get_content_tokens(doc)]
     if not lemmas:
         return 0.0
 
@@ -45,7 +45,7 @@ def calculate_mean_frequency_with_coverage(doc: Doc):
     Рассчитывает среднюю Zipf-частоту (с повторениями и без) и покрытие словарем.
     Calculates the mean Zipf-frequency for unique and all lemmas, as well as coverage.
     """
-    lemmas = content_lemmas(doc)
+    lemmas = [token.lemma_ for token in get_content_tokens(doc)]
 
     if not lemmas:
         return {
