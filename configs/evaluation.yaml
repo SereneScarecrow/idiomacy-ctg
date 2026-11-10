@@ -1,0 +1,47 @@
+# output folder name
+experiment: idiomacy-ctg
+
+# evaluation params
+backend: gigachat
+model: GigaChat-2-Max
+temperature: 0.0
+max_tokens: 1500
+extra: {}
+
+prompt: judge_v1
+
+# data
+baseline:
+  path: data/processed/dataset_maxi.csv
+generated:
+  path: results/idiomacy-ctg_20261105-170421/generations.jsonl
+
+# JSON-schema
+schema:
+  type: "object"
+  required: ["grammar", "fluency", "naturalness", "idiomaticity", "idiomatic_expressions"]
+  additionalProperties: false
+  properties:
+    grammar:
+      type: "integer"
+      minimum: 0
+      maximum: 5
+      description: "Грамматическая корректность текста. Оценка от 0 до 5, где 0 — множество грубых грамматических ошибок, 5 — безупречная грамматика, нет ни одной ошибки."
+    fluency:
+      type: "integer"
+      minimum: 0
+      maximum: 5
+      description: "Плавность и естественность речи. Оценка от 0 до 5, где 0 — неестественные конструкции, рваный ритм, 5 — текст читается легко и плавно, как у носителя."
+    naturalness:
+      type: "integer"
+      minimum: 0
+      maximum: 5
+      description: "Естественность и осмысленность употребления идиоматических выражений. Оценка от 0 до 5, где 0 — идиомы вставлены неестественно, как чужеродные элементы, 5 — идиомы органично вплетены в контекст."
+    idiomaticity:
+      type: "integer"
+      minimum: 0
+      maximum: 2
+      description: "Общая образность и насыщенность текста идиомами. Оценка от 0 до 2, где 0 — текст абсолютно буквальный, ни одной идиомы, 1 — есть несколько идиом, текст образный, 2 — предельно насыщенный идиоматичный текст, где почти каждое предложение содержит образные выражения."
+    idiomatic_expressions:
+      type: "string"
+      description: "Полный список всех идиоматических выражений, встреченных в тексте, в той форме, в которой они встретились."

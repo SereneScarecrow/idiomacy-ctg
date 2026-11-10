@@ -62,6 +62,7 @@ class LLMClient(ABC):
 # so heavy dependencies (torch, transformers) are not needed for the other backends
 _BACKENDS = {
     "ollama": ("idiomacy.llm.ollama_client", "OllamaClient"),
+    "gigachat": ("idiomacy.llm.gigachat_client", "GigaChatClient"),
     # "openrouter": ("idiomacy.llm.openrouter_client", "OpenRouterClient"),
     # "hf": ("idiomacy.llm.hf_client", "HuggingFaceClient"),
 }
