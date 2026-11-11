@@ -10,6 +10,8 @@ Every run lives in its own folder results/<run_id>/:
 If a run fails or is interrupted, it can be continued: the texts that are already in
 generations.jsonl are skipped.
 
+Shared helpers (paths, errors, manifest, JSONL log, retry) live in common.py.
+
 Usage:
     python -m idiomacy.pipeline.generate configs/generation.yaml
     python -m idiomacy.pipeline.generate configs/generation.yaml --resume <run_id>
@@ -19,44 +21,27 @@ import argparse
 import csv
 import itertools
 import json
-import os
-import re
-import subprocess
 import sys
-import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
 from pathlib import Path
 
-import yaml
 from tqdm import tqdm
 
 from idiomacy.llm.base import LLMClient, LLMError, Request, Response, create_client
-from idiomacy.llm.prompts import Prompt, load_prompt
+from idiomacy.llm.prompts import Prompt
+from idiomacy.pipeline.common import (
+    MANIFEST_NAME, PROJECT_ROOT, RESULTS_DIR,
+    ConfigError, JsonlWriter, ResumeError,
+    check_llm_options, generate_with_retry, git_state, is_number, load_checked_prompt,
+    make_run_id, now_iso, read_jsonl, read_yaml_mapping, resolve_path, write_json_atomic,
+)
 
-# src/idiomacy/pipeline/generate.py -> project root
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-PROMPTS_DIR = PROJECT_ROOT / "prompts"
-RESULTS_DIR = PROJECT_ROOT / "results"
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "generation.yaml"
+GENERATIONS_NAME = "generations.jsonl"
 
 # columns of the processed dataset: the model gets the literal version of the text
 ID_COLUMN = "text_id"
 TEXT_COLUMN = "literal_text"
-
-MANIFEST_NAME = "manifest.json"
-GENERATIONS_NAME = "generations.jsonl"
-
-MAX_ATTEMPTS = 3        # per generation, only for backend errors (server down, ...)
-RETRY_DELAY_S = 5       # grows linearly: 5 s, 10 s, ...
-
-
-class ConfigError(ValueError):
-    """The config (or a file it refers to) is invalid."""
-
-
-class ResumeError(RuntimeError):
-    """The run cannot be continued (not found, or something changed since it started)."""
 
 
 # ----------------------------------------------------------------------------
@@ -89,27 +74,20 @@ class GenerationConfig:
         return json.loads(json.dumps(asdict(self)))
 
 
-def _is_number(value) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
-
-
 def load_and_validate_config(config_path: Path) -> GenerationConfig:
     """
     Loads the config and validates existing fields.
     All problems are collected and reported together.
     """
-    config_path = Path(config_path)
-    if not config_path.is_file():
-        raise ConfigError(f"Config not found: {config_path}")
-    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ConfigError(f"{config_path}: expected a mapping at the top level")
-
+    raw = read_yaml_mapping(config_path)
     errors: list[str] = []
 
     unknown = sorted(set(raw) - _ALLOWED_KEYS)
     if unknown:
         errors.append(f"unknown keys: {unknown} (typo?)")
+
+    # experiment, backend, temperature, max_tokens, extra
+    options = check_llm_options(raw, errors)
 
     def string_list(key: str) -> tuple[str, ...]:
         value = raw.get(key)
@@ -120,25 +98,10 @@ def load_and_validate_config(config_path: Path) -> GenerationConfig:
             errors.append(f"'{key}' contains duplicates")
         return tuple(value)
 
-    experiment = raw.get("experiment")
-    if not isinstance(experiment, str) or not re.fullmatch(r"[\w.-]+", experiment):
-        errors.append("'experiment' must be a string of letters, digits, '_', '-', '.' (it becomes a folder name)")
-        experiment = ""
-
-    backend = raw.get("backend", "ollama")
-    if not isinstance(backend, str) or not backend:
-        errors.append("'backend' must be a string (default: ollama)")
-        backend = ""
-
-    temperature = raw.get("temperature")
-    if not _is_number(temperature) or temperature < 0:
-        errors.append("'temperature' must be a number >= 0")
-        temperature = 0.0
-
     thresholds = {}
     for key in ("low_max", "high_min"):
         value = raw.get(key)
-        if value is not None and not _is_number(value):
+        if value is not None and not is_number(value):
             errors.append(f"'{key}' must be a number or empty")
             value = None
         thresholds[key] = value
@@ -162,38 +125,27 @@ def load_and_validate_config(config_path: Path) -> GenerationConfig:
     elif len(set(seeds)) != len(seeds):
         errors.append("'seeds' contains duplicates")
 
-    max_tokens = raw.get("max_tokens")
-    if max_tokens is not None and (not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or max_tokens <= 0):
-        errors.append("'max_tokens' must be a positive integer or empty")
-        max_tokens = None
-
     schema = raw.get("schema")
-    if schema is not None:
-        if not isinstance(schema, dict):
-            errors.append("'schema' must be a mapping (valid JSON Schema object)")
-            schema = None 
-
-    extra = raw.get("extra") or {}
-    if not isinstance(extra, dict):
-        errors.append("'extra' must be a mapping")
-        extra = {}
+    if schema is not None and not isinstance(schema, dict):
+        errors.append("'schema' must be a mapping (valid JSON Schema object)")
+        schema = None
 
     if errors:
         raise ConfigError(f"Invalid config {config_path}:\n  - " + "\n  - ".join(errors))
 
     return GenerationConfig(
-        experiment=experiment,
-        backend=backend,
-        temperature=float(temperature),
+        experiment=options["experiment"],
+        backend=options["backend"],
+        temperature=options["temperature"],
         low_max=thresholds["low_max"],
         high_min=thresholds["high_min"],
         prompts=prompts,
         models=models,
         dataset_path=dataset_path,
         seeds=tuple(seeds),
-        max_tokens=max_tokens,
+        max_tokens=options["max_tokens"],
         schema=schema,
-        extra=extra,
+        extra=options["extra"],
     )
 
 
@@ -203,8 +155,7 @@ def load_and_validate_config(config_path: Path) -> GenerationConfig:
 
 def load_dataset(path: Path) -> list[dict]:
     """Reads the dataset; returns [{'id': str, 'text': str}, ...] in file order."""
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
+    path = resolve_path(path)
     if not path.is_file():
         raise ConfigError(f"Dataset not found: {path}")
     with path.open(encoding="utf-8-sig", newline="") as file:
@@ -235,54 +186,17 @@ def prompt_values(cfg: GenerationConfig, text: str) -> dict:
 
 
 def load_prompts(cfg: GenerationConfig) -> dict[str, Prompt]:
-    """Loads all prompts of the config and checks that every placeholder will get a value."""
-    prompts = {}
+    """
+    Loads all prompts of the config and checks that every placeholder will get a value
+    (low_max/high_min are available only if they are set in the config).
+    """
     available = set(prompt_values(cfg, ""))
-    for name in cfg.prompts:
-        path = PROMPTS_DIR / f"{name}.txt"
-        if not path.is_file():
-            raise ConfigError(f"Prompt file not found: {path}")
-        prompt = load_prompt(path)
-        no_value = [v for v in prompt.variables if v not in available]
-        if no_value:
-            raise ConfigError(
-                f"Prompt {name!r} uses {no_value}, which have no value "
-                f"(available: {sorted(available)}; low_max/high_min must be set in the config to be used)"
-            )
-        prompts[name] = prompt
-    return prompts
+    return {name: load_checked_prompt(name, available) for name in cfg.prompts}
 
 
 # ----------------------------------------------------------------------------
 # run folder: manifest and generations
 # ----------------------------------------------------------------------------
-
-def now_iso() -> str:
-    return datetime.now().astimezone().isoformat(timespec="seconds")
-
-
-def make_run_id(experiment: str) -> str:
-    return f"{experiment}_{datetime.now():%Y%m%d-%H%M%S}"
-
-
-def git_state() -> dict | None:
-    """Commit of the code the run was started from (None outside a git repo)."""
-    def git(*args):
-        return subprocess.run(
-            ["git", *args], cwd=PROJECT_ROOT, capture_output=True, text=True, check=True
-        ).stdout.strip()
-    try:
-        return {"commit": git("rev-parse", "HEAD"), "dirty": bool(git("status", "--porcelain"))}
-    except (OSError, subprocess.CalledProcessError):
-        return None
-
-
-def write_json_atomic(path: Path, data: dict) -> None:
-    """A crash in the middle of writing never leaves a broken manifest."""
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
-
 
 def build_manifest_header(
     cfg: GenerationConfig,
@@ -337,45 +251,13 @@ def check_resume_compatible(manifest: dict, header: dict) -> None:
         raise ResumeError("Cannot resume:\n  - " + "\n  - ".join(problems))
 
 
-class JsonlWriter:
-    """Append-only JSON lines file; every record is flushed to disk immediately."""
-
-    def __init__(self, path: Path):
-        needs_newline = False
-        if path.exists() and path.stat().st_size > 0:
-            with path.open("rb") as file:  # a crash can leave the last line unfinished
-                file.seek(-1, os.SEEK_END)
-                needs_newline = file.read(1) != b"\n"
-        self._file = path.open("a", encoding="utf-8", newline="\n")
-        if needs_newline:
-            self._file.write("\n")
-            self._file.flush()
-
-    def write(self, record: dict) -> None:
-        self._file.write(json.dumps(record, ensure_ascii=False) + "\n")
-        self._file.flush()
-        os.fsync(self._file.fileno())
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_info):
-        self._file.close()
-
-
 def read_done_keys(path: Path) -> set[tuple]:
     """Keys (model, prompt, seed, text_id) of the generations that are already saved."""
-    done = set()
-    if not path.exists():
-        return done
-    with path.open(encoding="utf-8") as file:
-        for line in file:
-            try:
-                record = json.loads(line)
-                done.add((record["model"], record["prompt"], record["seed"], record["text_id"]))
-            except (json.JSONDecodeError, KeyError):
-                continue  # unfinished line left by a crash: this text will be generated again
-    return done
+    return {
+        (r["model"], r["prompt"], r["seed"], r["text_id"])
+        for r in read_jsonl(path)
+        if all(key in r for key in ("model", "prompt", "seed", "text_id"))
+    }
 
 
 # ----------------------------------------------------------------------------
@@ -384,19 +266,6 @@ def read_done_keys(path: Path) -> set[tuple]:
 
 def total_generations(cfg: GenerationConfig, items: list[dict]) -> int:
     return len(cfg.models) * len(cfg.prompts) * len(cfg.seeds) * len(items)
-
-
-def generate_with_retry(client: LLMClient, request: Request) -> Response:
-    """Backend errors are retried a few times; if the backend stays down, the error is raised."""
-    for attempt in range(1, MAX_ATTEMPTS + 1):
-        try:
-            return client.generate(request)
-        except LLMError as error:
-            if attempt == MAX_ATTEMPTS:
-                raise
-            delay = RETRY_DELAY_S * attempt
-            tqdm.write(f"{error} - retry {attempt}/{MAX_ATTEMPTS - 1} in {delay} s")
-            time.sleep(delay)
 
 
 def make_record(model: str, prompt: Prompt, seed: int, item: dict, request: Request, response: Response) -> dict:
