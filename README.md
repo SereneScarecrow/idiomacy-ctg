@@ -1,4 +1,4 @@
-# CONTROLLED TEXT GENERATION BASED ON THE LEVEL OF IDIOMACY
+# CONTROLLED TEXT GENERATION BASED ON THE LEVEL OF IDIOMATICITY
 
 > **NOTE: the project code is currently undergoing revision. The main goal of the revision is to make the project easily reproducible. Unfortunately, some features may be unavailable at the moment.**
 
