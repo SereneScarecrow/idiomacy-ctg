@@ -30,9 +30,9 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from idiomacy.llm.base import LLMClient, LLMError, Request, create_client
-from idiomacy.llm.prompts import Prompt
-from idiomacy.pipeline.common import (
+from idiomaticity.llm.base import LLMClient, LLMError, Request, create_client
+from idiomaticity.llm.prompts import Prompt
+from idiomaticity.pipeline.common import (
     MANIFEST_NAME, PROJECT_ROOT, RESULTS_DIR,
     ConfigError, JsonlWriter, ResumeError,
     check_llm_options, generate_with_retry, git_state, is_number, load_checked_prompt,

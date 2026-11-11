@@ -9,7 +9,7 @@ import urllib.request
 
 import ollama
 
-from idiomacy.llm.base import LLMClient, LLMError, Request, Response
+from idiomaticity.llm.base import LLMClient, LLMError, Request, Response
 
 
 class OllamaClient(LLMClient):

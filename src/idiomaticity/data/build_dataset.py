@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from idiomacy.metrics.spans import align_idioms, covered_words, occurrence_mismatches, parse_idioms
-from idiomacy.metrics.text import TEXT_PIPELINE_VERSION, count_words, normalize_text
+from idiomaticity.metrics.spans import align_idioms, covered_words, occurrence_mismatches, parse_idioms
+from idiomaticity.metrics.text import TEXT_PIPELINE_VERSION, count_words, normalize_text
 
 # columns that must be in the raw file (text_id is created from the row order if absent)
 REQUIRED_COLUMNS = [

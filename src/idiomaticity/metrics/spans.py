@@ -11,7 +11,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
-from idiomacy.metrics.text import normalize_text, tokenize
+from idiomaticity.metrics.text import normalize_text, tokenize
 
 # [word]: a clarification added by the annotator, e.g. 'тычет им [недостатком] в глаза'
 _BRACKET_GROUP = re.compile(r"\[[^\]]*\]")

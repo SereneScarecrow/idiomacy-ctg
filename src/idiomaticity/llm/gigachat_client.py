@@ -23,7 +23,7 @@ from gigachat import GigaChat
 from gigachat.exceptions import GigaChatException
 from gigachat.models import Chat, Messages, MessagesRole
 
-from idiomacy.llm.base import LLMClient, LLMError, Request, Response
+from idiomaticity.llm.base import LLMClient, LLMError, Request, Response
 
 from dotenv import load_dotenv
 
