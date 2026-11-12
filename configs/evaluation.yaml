@@ -19,7 +19,7 @@ generated:
 # JSON-schema
 schema:
   type: "object"
-  required: ["grammar", "fluency", "naturalness", "idiomaticity", "idiomatic_expressions"]
+  required: ["grammar", "fluency", "naturalness", "idiomaticity", "diversity", "idiomatic_expressions"]
   additionalProperties: false
   properties:
     grammar:
