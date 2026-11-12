@@ -4,12 +4,6 @@ langfuse
 pandas
 tqdm
 
-# библиотеки для работы с моделями
-langchain
-langchain_ollama
-langchain_openrouter
-langchain_gigachat
-
 # библиотеки для работы с метриками
 bert-score
 bleurt-pytorch

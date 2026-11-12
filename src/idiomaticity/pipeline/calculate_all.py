@@ -12,7 +12,7 @@ The output has the chosen input fields plus the new ones. An error in one record
 not stop the run: it is written to `metric_errors` and the value of the metric is null.
 
 Usage:
-    python -m idiomaticity.metrics.calculate_all in.jsonl out.jsonl \
+    python -m idiomaticity.pipeline.calculate_all in.jsonl out.jsonl \
         --abstractness-dict data/abstractness.json [--w2v-path vectors.bin] [--skip perplexity]
 
 Next to out.jsonl a out.manifest.json is written (metric settings, text pipeline version).

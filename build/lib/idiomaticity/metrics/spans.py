@@ -10,8 +10,9 @@ All offsets refer to the NORMALIZED text (see normalize_text).
 import re
 from collections import Counter
 from dataclasses import dataclass
+from functools import lru_cache
 
-from idiomaticity.metrics.text import normalize_text, tokenize
+from idiomaticity.metrics.text import get_nlp, normalize_text, tokenize
 
 # [word]: a clarification added by the annotator, e.g. 'тычет им [недостатком] в глаза'
 _BRACKET_GROUP = re.compile(r"\[[^\]]*\]")
@@ -22,7 +23,7 @@ class IdiomMatch:
     idiom: str          # normalized idiom (as annotated)
     start: int | None   # character offsets of the occurrence this entry is assigned to
     end: int | None     # (None if the idiom was not found)
-    method: str         # exact | casefold | bracket | not_found
+    method: str         # exact | casefold | bracket | lemma | not_found
     n_occurrences: int  # how many times the idiom occurs in the text
     occurrence: int     # 0-based: how many identical entries were listed before this one
 
@@ -65,6 +66,47 @@ def _variants(idiom: str):
         yield idiom.replace("[", "").replace("]", ""), "bracket"  # bracketed word is in the text
 
 
+# an idiom must not run over a sentence border
+_SENTENCE_END = re.compile(r"[.!?…\n]")
+
+
+def _is_word(text: str) -> bool:
+    return any(ch.isalnum() for ch in text)
+
+
+def _lemma(token) -> str:
+    return (token.lemma_ or token.text).lower().replace("ё", "е")
+
+
+@lru_cache(maxsize=256)
+def _text_lemmas(text: str) -> tuple[tuple[str, int, int], ...]:
+    """(lemma, start, end) of every word of the text. Cached: the same text is aligned several times."""
+    return tuple((_lemma(t), t.idx, t.idx + len(t.text)) for t in get_nlp()(text) if _is_word(t.text))
+
+
+def _lemma_occurrences(text: str, needle: str):
+    """
+    All non-overlapping occurrences of `needle` found by lemmas: ('lemma', [(start, end), ...]) or None.
+    Fallback for idioms that the judge gives in another word form than the text has
+    ('королеву игрового трона' is found in 'королевой игрового трона').
+    The words must follow each other without a sentence border between them.
+    """
+    target = [_lemma(t) for t in get_nlp()(needle) if _is_word(t.text)]
+    if not target:
+        return None
+    words = _text_lemmas(text)
+    spans, i, n = [], 0, len(target)
+    while i + n <= len(words):
+        window = words[i:i + n]
+        same = [w[0] for w in window] == target
+        if same and not any(_SENTENCE_END.search(text[a[2]:b[1]]) for a, b in zip(window, window[1:])):
+            spans.append((window[0][1], window[-1][2]))
+            i += n
+        else:
+            i += 1
+    return ("lemma", spans) if spans else None
+
+
 def align_idioms(text: str, idioms: list[str]) -> list[IdiomMatch]:
     """
     Finds each idiom in the text. `text` must be normalized (offsets depend on it);
@@ -72,7 +114,9 @@ def align_idioms(text: str, idioms: list[str]) -> list[IdiomMatch]:
 
     If the same idiom is listed several times, the k-th entry is assigned to the k-th
     occurrence in the text, so every listed repetition covers its own words.
-    Idioms that cannot be found are returned with method='not_found'.
+    Search order: the exact string, the case-insensitive string, then the lemmas of the words
+    (the idiom is given in another word form). Idioms that cannot be found are returned with
+    method='not_found'.
     """
     if text != normalize_text(text):
         raise ValueError("text must be normalized before aligning idioms")
@@ -86,13 +130,17 @@ def align_idioms(text: str, idioms: list[str]) -> list[IdiomMatch]:
         listed_before[idiom.casefold()] += 1
 
         match = None
-        for variant, tag in _variants(idiom):
-            found = _occurrences(text, variant)
-            if found:
-                method, spans = found
-                # more entries than occurrences: the extra entries reuse the last occurrence
-                start, end = spans[min(k, len(spans) - 1)]
-                match = IdiomMatch(idiom, start, end, tag or method, len(spans), k)
+        for finder in (_occurrences, _lemma_occurrences):   # surface forms first, then lemmas
+            for variant, tag in _variants(idiom):
+                found = finder(text, variant)
+                if found:
+                    method, spans = found
+                    # more entries than occurrences: the extra entries reuse the last occurrence
+                    start, end = spans[min(k, len(spans) - 1)]
+                    match = IdiomMatch(idiom, start, end, method if method == "lemma" else (tag or method),
+                                       len(spans), k)
+                    break
+            if match:
                 break
         matches.append(match or IdiomMatch(idiom, None, None, "not_found", 0, k))
     return matches

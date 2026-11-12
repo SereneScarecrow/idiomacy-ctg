@@ -48,8 +48,9 @@ log = logging.getLogger("calculate_all")
 @dataclass
 class Config:
     # field names in the input jsonl
-    text_field: str = "text"            # the text to evaluate   
-    judge_field: str = "answer"                   # the judge's dict (must contain "idioms")
+    text_field: str = "text"            # the text to evaluate
+    judge_field: str = "answer"                   # the judge's dict
+    judge_idioms_key: str = "idiomatic_expressions"   # key of the idiom list inside the judge's dict
     drop_fields: Optional[list[str]] = None
     reference_csv: Optional[Path] = None
     reference_id_field: str = "text_id"
@@ -97,10 +98,11 @@ def preprocess(rec: dict, cfg: Config) -> Row:
     row.text = normalize_text(text) if isinstance(text, str) else ""
     reference = None
     if cfg.reference_csv is not None:
-        refs = _load_reference_csv(cfg)
         rid = rec.get(cfg.record_id_field)
-        reference = refs.get(str(rid))
+        reference = _load_reference_csv(cfg).get(str(rid))
     row.reference = normalize_text(reference) if isinstance(reference, str) else ""
+    if cfg.reference_csv is not None and not row.reference:
+        row.errors["reference"] = f"no reference in the csv for {cfg.record_id_field}={rec.get(cfg.record_id_field)!r}"
     row.out["text_norm"] = row.text
     row.out["n_words"] = count_words(row.text) if row.text else 0
     row.out["text_pipeline_version"] = TEXT_PIPELINE_VERSION
@@ -110,8 +112,8 @@ def preprocess(rec: dict, cfg: Config) -> Row:
     # judge: the schema is strict, only the idiom list is normalized
     try:
         judge = rec[cfg.judge_field]
-        row.idioms = normalize_idioms(judge["idiomatic_expressions"])
-        row.out["judge_norm"] = {**judge, "idioms": row.idioms}
+        row.idioms = normalize_idioms(judge[cfg.judge_idioms_key])
+        row.out["judge_norm"] = {**judge, cfg.judge_idioms_key: row.idioms}   # schema keys are kept as they are
     except (KeyError, TypeError) as exc:
         row.errors["judge"] = f"no judge idioms: {type(exc).__name__}: {exc}"
 
@@ -188,7 +190,7 @@ def _load_reference_csv(cfg: Config) -> dict[str, str]:
     key = (str(cfg.reference_csv), cfg.reference_csv_field, cfg.reference_id_field)
     if key not in _ref_csv_cache:
         import csv
-        with open(cfg.reference_csv, encoding="utf-8", newline="") as f:
+        with open(cfg.reference_csv, encoding="utf-8-sig", newline="") as f:
             _ref_csv_cache[key] = {
                 str(r[cfg.reference_id_field]): r[cfg.reference_csv_field]
                 for r in csv.DictReader(f)
@@ -439,7 +441,7 @@ def calculate_all(records: list[dict], cfg: Config, stages: Optional[list[str]] 
             rec["metric_errors"] = row.errors
         if cfg.drop_fields:
             for key in cfg.drop_fields:
-                rec.pop(key, None)                # нет ключа — не падаем
+                rec.pop(key, None)                # a missing key is fine
         results.append(rec)
     return results
 
@@ -491,7 +493,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         text_field=args.text_field, judge_field=args.judge_field,
         abstractness_dict=args.abstractness_dict, w2v_path=args.w2v_path, window=args.window,
         device=args.device, ppl_model=args.ppl_model, ppl_dtype=args.ppl_dtype, drop_fields=args.drop_fields,
-        reference_csv=args.reference_csv, reference_csv_field=args.reference_csv_field, 
+        reference_csv=args.reference_csv, reference_csv_field=args.reference_csv_field,
         reference_id_field=args.reference_csv_id, record_id_field=args.record_id_field,
     )
     stages = [s for s in (args.only or list(STAGES)) if s not in args.skip]
