@@ -15,8 +15,8 @@ from pathlib import Path
 import yaml
 from tqdm import tqdm
 
-from idiomacy.llm.base import LLMClient, LLMError, Request, Response
-from idiomacy.llm.prompts import Prompt, load_prompt
+from idiomaticity.llm.base import LLMClient, LLMError, Request, Response
+from idiomaticity.llm.prompts import Prompt, load_prompt
 
 # src/idiomacy/pipeline/common.py -> project root
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
